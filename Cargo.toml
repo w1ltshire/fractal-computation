@@ -1,0 +1,18 @@
+[package]
+name = "fractal-computation"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.99"
+bytemuck = "1.23.2"
+glam = "0.31.0"
+log = "0.4.28"
+wgpu = "28.0"
+eframe = { version = "0.33.3", features = ["default"] }
+egui = "0.33.3"
+egui_extras = { version = "0.33.3", features = ["default", "image"] }
+macroquad = "0.4.14"
+env_logger = "0.11.8"
+num-complex = "0.4.6"
+tokio = { version = "1.49.0", features = ["rt", "rt-multi-thread", "macros"] }
