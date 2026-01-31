@@ -12,7 +12,8 @@ wgpu = "28.0"
 eframe = { version = "0.33.3", features = ["default"] }
 egui = "0.33.3"
 egui_extras = { version = "0.33.3", features = ["default", "image"] }
-macroquad = "0.4.14"
 env_logger = "0.11.8"
 num-complex = "0.4.6"
+image = "0.25.9"
+rayon = "1.11.0"
 tokio = { version = "1.49.0", features = ["rt", "rt-multi-thread", "macros"] }
