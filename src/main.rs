@@ -3,6 +3,7 @@ use image::{ImageBuffer, Rgba};
 type Complex = num_complex::Complex<f64>;
 
 mod cpu;
+mod gpu;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
