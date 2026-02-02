@@ -3,11 +3,13 @@ use image::{ImageBuffer, Rgba};
 
 mod cpu;
 mod gpu;
+mod ui;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
-    const WIDTH: u32 = 1000;
+    ui::run()?;
+    /*const WIDTH: u32 = 1000;
     const HEIGHT: u32 = 1000;
 
     let mut data: Vec<[u8; 4]> = vec![[0; 4]; (WIDTH * HEIGHT) as usize];
@@ -22,6 +24,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         imgbuf.put_pixel(x, y, Rgba([pixel[0], pixel[1], pixel[2], pixel[3]]));
     }
 
-    imgbuf.save("mandelbrot.png").unwrap();
+    imgbuf.save("mandelbrot.png").unwrap();*/
     Ok(())
 }
