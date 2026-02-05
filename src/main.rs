@@ -1,5 +1,4 @@
 #![feature(portable_simd)]
-use image::{ImageBuffer, Rgba};
 
 mod cpu;
 mod gpu;

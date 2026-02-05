@@ -1,12 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![expect(rustdoc::missing_crate_level_docs)] // it's an example
 
-use std::sync::Arc;
 use eframe::egui;
-use egui::{ColorImage, Context, Image, TextureHandle, TextureOptions};
+use egui::{ColorImage, Context, TextureHandle, TextureOptions, Ui};
 use egui::epaint::ImageDelta;
 use image::{ImageBuffer, Rgba};
-use rayon::iter::Fold;
 use crate::cpu;
 
 const WIDTH: u32 = 800;
@@ -18,7 +16,7 @@ pub fn run() -> eframe::Result {
 		..Default::default()
 	};
 	eframe::run_native(
-		"My egui App",
+		"fractal-computation",
 		options,
 		Box::new(|cc| {
 			egui_extras::install_image_loaders(&cc.egui_ctx);
@@ -31,7 +29,11 @@ pub fn run() -> eframe::Result {
 struct App {
 	texture: Option<TextureHandle>,
 	data: Vec<[u8; 4]>,
-	state: State
+	state: State,
+	zoom: f64,
+	zoom_center: (f64, f64),
+	old_zoom: f64,
+	old_zoom_center: (f64, f64),
 }
 
 #[derive(Default)]
@@ -50,6 +52,8 @@ impl App {
 			self.state.to,
 			WIDTH,
 			HEIGHT,
+			self.zoom,
+			self.zoom_center,
 		);
 
 		self.state.old_from = Some(self.state.from);
@@ -98,22 +102,55 @@ impl Default for App {
 				old_from: None,
 				old_to: None,
 			},
+			zoom: 1.0,
+			zoom_center: (0.0, 0.0),
+			old_zoom: 1.0,
+			old_zoom_center: (0.0, 0.0),
 		}
 	}
+}
+
+fn ui_image_responsive(ui: &mut Ui, texture: &TextureHandle) {
+	let available = ui.available_rect_before_wrap();
+
+	let original_size = texture.size();
+	let aspect = original_size[0] as f32 / original_size[1] as f32;
+
+	let width = available.width();
+	let height = (width / aspect).min(available.height());
+
+	ui.allocate_ui_with_layout(
+		egui::vec2(width, height),
+		egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+		|ui| {
+			ui.image(texture);
+		},
+	);
 }
 
 impl eframe::App for App {
 	fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
 		egui::CentralPanel::default().show(ctx, |ui| {
-			if self.state.old_from.is_none() { // it's enough to check one field (`to`) in this case 'cause they're like paired
+			if let Some(old_from) = self.state.old_from && let Some(old_to) = self.state.old_to {
+				if old_to != self.state.to {
+					self.render(ctx);
+				}
+				if old_from != self.state.from {
+					self.render(ctx);
+				}
+			} else {
 				self.render(ctx);
 			}
+			if self.old_zoom != self.zoom || self.old_zoom_center != self.zoom_center {
+				self.render(ctx);
+			}
+			ui.add(egui::Slider::new(&mut self.zoom, 1.0..=100.0).text("zoom"));
+			ui.add(egui::Slider::new(&mut self.zoom_center.0, -10.0..=10.0).text("zoom_center.0"));
+			ui.add(egui::Slider::new(&mut self.zoom_center.1, -10.0..=10.0).text("zoom_center.1"));
 
-			egui::CentralPanel::default().show(ctx, |ui| {
-				if let Some(tex) = &self.texture {
-					ui.image(tex);
-				}
-			});
+			if let Some(tex) = &self.texture {
+				ui_image_responsive(ui, tex);
+			}
 		});
 	}
 }
