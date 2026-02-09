@@ -3,7 +3,17 @@ use std::sync::{Arc, Mutex};
 use rayon::prelude::*;
 use std::simd::prelude::*;
 
-pub fn mandelbrot(data: &mut [[u8; 4]], from: (f64, f64), to: (f64, f64), width: u32, height: u32, iters: usize) {
+#[derive(Debug)]
+pub struct MandelbrotTile {
+	pub data: Vec<[u8; 4]>,
+	pub width: usize,
+	pub height: usize,
+	pub x: f64,
+	pub y: f64,
+	pub iters: usize,
+}
+
+pub fn mandelbrot_simd(data: &mut [[u8; 4]], from: (f64, f64), to: (f64, f64), width: u32, height: u32, iters: usize) {
 	let width = width as usize;
 	let height = height as usize;
 

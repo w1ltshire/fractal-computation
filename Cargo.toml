@@ -1,16 +1,3 @@
-[package]
-name = "fractal-computation"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-log = "0.4.28"
-wgpu = "28.0"
-eframe = { version = "0.33.3", features = ["default"] }
-egui = "0.33.3"
-egui_extras = { version = "0.33.3", features = ["default", "image"] }
-env_logger = "0.11.8"
-image = "0.25.9"
-rayon = "1.11.0"
-tokio = { version = "1.49.0", features = ["rt", "rt-multi-thread", "macros"] }
-itertools = "0.14.0"
+[workspace]
+members = ["mandelbrot","web"]
+resolver = "3"
