@@ -57,3 +57,32 @@ pub fn mandelbrot_simd(data: &mut [[u8; 4]], from: (f64, f64), to: (f64, f64), w
 		}
 	});
 }
+
+pub fn mandelbrot_set(
+	real: Range<f64>,
+	complex: Range<f64>,
+	samples: (usize, usize),
+	max_iter: usize
+) -> Vec<(f64, f64, usize)> {
+	let step = (
+		(real.end - real.start) / samples.0 as f64,
+		(complex.end - complex.start) / samples.1 as f64,
+	);
+
+	(0..(samples.0 * samples.1))
+		.into_par_iter()
+		.map(|k| {
+			let c = (
+				real.start + step.0 * (k % samples.0) as f64,
+				complex.start + step.1 * (k / samples.0) as f64,
+			);
+			let mut z = (0.0, 0.0);
+			let mut cnt = 0;
+			while cnt < max_iter && z.0 * z.0 + z.1 * z.1 <= 1e10 {
+				z = (z.0 * z.0 - z.1 * z.1 + c.0, 2.0 * z.0 * z.1 + c.1);
+				cnt += 1;
+			}
+			(c.0, c.1, cnt)
+		})
+		.collect()
+}
