@@ -5,6 +5,8 @@
       <sourceFolder url="file://$MODULE_DIR$/mandelbrot/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/mandelbrot/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/mandelbrot/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ui/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ui_old/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/web/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/web/target" />
