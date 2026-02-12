@@ -1,3 +1,4 @@
+use std::ops::Range;
 use itertools::Itertools;
 use std::sync::{Arc, Mutex};
 use rayon::prelude::*;
