@@ -48,7 +48,7 @@ impl FractalTiles {
 	fn load(&mut self, tile_id: TileId) -> CachedTexture {
 		self.tiles
 			.get_or_insert(tile_id, || {
-				self.parent_thread_sender.send(ThreadMessage::CreateWork(tile_id)).unwrap();
+				self.parent_thread_sender.send(ThreadMessage::CreateWork(tile_id, self.mandelbrot_set_properties.iterations)).unwrap();
 				let scale = 3.0 / (1 << tile_id.zoom) as f64;
 				let x_center = (tile_id.x as f64) * scale - 2.0;
 				let y_center = (tile_id.y as f64) * scale - 1.5;
