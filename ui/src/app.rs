@@ -1,3 +1,4 @@
+use egui::{DragValue, RichText};
 use walkers::{Map, MapMemory};
 use crate::threads;
 use crate::tiles::FractalTiles;
@@ -34,6 +35,16 @@ impl eframe::App for App {
 				}
 
 				egui::widgets::global_theme_preference_buttons(ui);
+			});
+		});
+
+		egui::SidePanel::right("side_panel").exact_width(160.0).show(ctx, |ui| {
+			ui.label(RichText::new("Parameters").size(18.0));
+			ui.separator();
+			ui.label(RichText::new("Render settings").size(14.0));
+			ui.horizontal(|ui| {
+				ui.label("Iterations");
+				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.iterations))
 			});
 		});
 

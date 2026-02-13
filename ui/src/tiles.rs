@@ -20,7 +20,7 @@ enum CachedTexture {
 pub struct FractalTiles {
 	tiles: LruCache<TileId, CachedTexture>,
 	egui_ctx: Context,
-	mandelbrot_set_properties: MandelbrotSetProperties,
+	pub(crate) mandelbrot_set_properties: MandelbrotSetProperties,
 	parent_thread_sender: KSender<ThreadMessage>,
 	parent_thread_receiver: KReceiver<ThreadMessage>,
 }
