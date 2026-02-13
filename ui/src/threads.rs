@@ -18,24 +18,37 @@ pub enum ThreadMessage {
 	/// Poll the worker thread assigned to this tile id
 	Poll(TileId),
 	/// The ready, calculated fractal set image
-	Completed(ColorImage)
+	Completed(ColorImage),
+	/// Thread has not yet completed its work
+	NotReady,
 }
 
 /// Create a parent thread
-pub fn create_parent_thread() -> Sender<ThreadMessage> {
-	let (sender, receiver) = kanal::unbounded::<ThreadMessage>();
+pub fn create_parent_thread() -> (Sender<ThreadMessage>, Receiver<ThreadMessage>) {
+	let (sender_to_parent, receiver_from_main) = kanal::unbounded::<ThreadMessage>();
+	let (sender_to_main, receiver_from_parent) = kanal::unbounded::<ThreadMessage>();
+
 	threads::spawn(move || {
 		debug!("parent thread is up");
-		let mut receivers: HashMap<TileId, Receiver<ThreadMessage>> = HashMap::new();
-		while let Ok(msg) = receiver.try_recv() {
+		let mut receivers: HashMap<TileId, (Sender<ThreadMessage>, Receiver<ThreadMessage>)> = HashMap::new();
+		while let Ok(msg) = receiver_from_main.try_recv() {
 			match msg {
 				Some(ThreadMessage::CreateWork(tile_id, iters)) => {
 					receivers.insert(tile_id, worker_thread(tile_id, iters));
 				}
 				Some(ThreadMessage::Poll(tile_id)) => {
-					let receiver = receivers.get_mut(&tile_id).unwrap();
-					if let Ok(Some(msg)) = receiver.try_recv() {
+					let pair = receivers.get_mut(&tile_id).unwrap();
+					if let Ok(Some(msg)) = pair.1.try_recv() {
 						debug!("thread received message from worker {tile_id:?}: {msg:?}");
+						match msg {
+							ThreadMessage::Completed(color_image) => {
+								sender_to_main.send(ThreadMessage::Completed(color_image)).unwrap();
+							}
+							ThreadMessage::NotReady => {
+								sender_to_main.send(ThreadMessage::NotReady).unwrap();
+							}
+							_ => {} // shouldn't receive anything else from the worker, ignore all other patterns
+						}
 					} else {
 
 					}
@@ -44,13 +57,13 @@ pub fn create_parent_thread() -> Sender<ThreadMessage> {
 			}
 		}
 	});
-	sender
+	(sender_to_parent, receiver_from_parent)
 }
 
-pub fn worker_thread(tile_id: TileId, iterations: usize) -> Receiver<ThreadMessage> {
+pub fn worker_thread(tile_id: TileId, iterations: usize) -> (Sender<ThreadMessage>, Receiver<ThreadMessage>) {
 	// one pair of sender/receiver for communication to the worker!
-	let (sender_to_worker, receiver_from_worker) = kanal::unbounded::<ThreadMessage>();
-	// and another pair of sender/receiver to communicate from the worker
+	let (sender_to_worker, receiver_from_parent) = kanal::unbounded::<ThreadMessage>();
+	let (sender_to_parent, receiver_from_worker) = kanal::unbounded::<ThreadMessage>();
 
 	threads::spawn(move || {
 		debug!("worker thread for tile {tile_id:?} is up");
@@ -87,12 +100,17 @@ pub fn worker_thread(tile_id: TileId, iterations: usize) -> Receiver<ThreadMessa
 		);
 
 		// if we receive a poll request from the parent thread then we'll check if color image is ready,
-		// and then send ThreadMessage::Completed(ColorImage) to it (otherwise send ThreadMessage:NotRead),
+		// and then send ThreadMessage::Completed(ColorImage) to it (otherwise send ThreadMessage:NotReady but idk how can this happen),
 		// so to do this we: have a receiver from the parent and a sender to the parent
 
-		/*while let Ok(Some(msg)) = receiver.try_recv() {
-
-		};*/
+		while let Ok(Some(msg)) = receiver_from_parent.try_recv() {
+			match msg {
+				ThreadMessage::Poll(_) => {
+					sender_to_parent.send(ThreadMessage::Completed(color_image.clone())).unwrap();
+				},
+				_ => {}
+			}
+		};
 	});
-	receiver_from_worker
+	(sender_to_worker, receiver_from_worker)
 }

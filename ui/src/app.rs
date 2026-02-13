@@ -13,7 +13,7 @@ pub struct App {
 impl App {
 	pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
 		let mut map_memory = MapMemory::default();
-		let parent_thread_sender = threads::create_parent_thread();
+		let (parent_thread_sender, parent_thread_receiver) = threads::create_parent_thread();
 		map_memory.set_zoom(1.).unwrap();
 		Self {
 			tiles: FractalTiles::new(cc.egui_ctx.clone(), parent_thread_sender.clone()),

@@ -4,7 +4,6 @@ use eframe::epaint::textures::TextureOptions;
 use egui::Context;
 use image::{ImageBuffer, Rgba};
 use kanal::Sender;
-use log::debug;
 use lru::LruCache;
 use walkers::{Tile, TileId, TilePiece, Tiles};
 use walkers::sources::Attribution;
@@ -56,8 +55,6 @@ impl FractalTiles {
 				let from = (x_center, y_center);
 				let to = (x_center + scale, y_center + scale);
 
-				let real_range = from.0..to.0;
-				let complex_range = from.1..to.1;
 				let samples = (512, 512);
 				let max_iter = self.mandelbrot_set_properties.iterations;
 
