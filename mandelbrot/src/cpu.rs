@@ -61,7 +61,7 @@ pub fn mandelbrot_set(
 	);
 
 	(0..(samples.0 * samples.1))
-		.into_par_iter()
+		.into_iter()
 		.map(|k| {
 			let c = (
 				real.start + step.0 * (k % samples.0) as f64,

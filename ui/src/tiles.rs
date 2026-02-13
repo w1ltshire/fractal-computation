@@ -1,9 +1,8 @@
 use eframe::emath::{pos2, Rect};
-use eframe::epaint::ColorImage;
 use eframe::epaint::textures::TextureOptions;
 use egui::Context;
-use image::{ImageBuffer, Rgba};
-use kanal::Sender;
+use kanal::{Receiver as KReceiver, Sender as KSender};
+use log::debug;
 use lru::LruCache;
 use walkers::{Tile, TileId, TilePiece, Tiles};
 use walkers::sources::Attribution;
@@ -14,17 +13,16 @@ pub type Set = Vec<(f64, f64, usize)>;
 #[derive(Clone)]
 enum CachedTexture {
 	Valid(Tile),
-	#[allow(unused)]
 	Invalid,
-	#[allow(unused)]
-	Pending
+	Pending,
 }
 
 pub struct FractalTiles {
 	tiles: LruCache<TileId, CachedTexture>,
 	egui_ctx: Context,
-	pub(crate) mandelbrot_set_properties: MandelbrotSetProperties,
-	parent_thread_sender: Sender<ThreadMessage>,
+	mandelbrot_set_properties: MandelbrotSetProperties,
+	parent_thread_sender: KSender<ThreadMessage>,
+	parent_thread_receiver: KReceiver<ThreadMessage>,
 }
 
 #[derive(Default)]
@@ -33,61 +31,80 @@ pub struct MandelbrotSetProperties {
 }
 
 impl FractalTiles {
-	pub fn new(egui_ctx: Context, parent_thread_sender: Sender<ThreadMessage>) -> Self {
+	pub fn new(
+		egui_ctx: Context,
+		parent_thread_sender: KSender<ThreadMessage>,
+		parent_thread_receiver: KReceiver<ThreadMessage>,
+	) -> Self {
 		Self {
 			tiles: LruCache::unbounded(),
 			egui_ctx,
-			mandelbrot_set_properties: MandelbrotSetProperties {
-				iterations: 255,
-			},
+			mandelbrot_set_properties: MandelbrotSetProperties { iterations: 255 },
 			parent_thread_sender,
+			parent_thread_receiver,
 		}
 	}
 
 	fn load(&mut self, tile_id: TileId) -> CachedTexture {
-		self.tiles
-			.get_or_insert(tile_id, || {
-				self.parent_thread_sender.send(ThreadMessage::CreateWork(tile_id, self.mandelbrot_set_properties.iterations)).unwrap();
-				let scale = 3.0 / (1 << tile_id.zoom) as f64;
-				let x_center = (tile_id.x as f64) * scale - 2.0;
-				let y_center = (tile_id.y as f64) * scale - 1.5;
-
-				let from = (x_center, y_center);
-				let to = (x_center + scale, y_center + scale);
-
-				let samples = (512, 512);
-				let max_iter = self.mandelbrot_set_properties.iterations;
-
-				let mut img = ImageBuffer::<Rgba<u8>, _>::new(256, 256);
-
-				for (c_re, c_im, count) in mandelbrot::cpu::mandelbrot_set(from.0..to.0, from.1..to.1, samples, max_iter) {
-					let x = ((c_re - from.0) / scale * 256.0) as u32;
-					let y = ((c_im - from.1) / scale * 256.0) as u32;
-
-					let color = if count < max_iter {
-						let intensity = (count as u8) % 255;
-						Rgba([intensity, intensity, intensity, 255])
+		if let Some(tex) = self.tiles.get(&tile_id) {
+			match tex {
+				CachedTexture::Valid(tile) => CachedTexture::Valid(tile.clone()),
+				CachedTexture::Invalid => CachedTexture::Invalid,
+				CachedTexture::Pending => {
+					if let Some(piece) = self.poll_tile(tile_id) {
+						self.tiles.put(tile_id, CachedTexture::Valid(piece.clone()));
+						CachedTexture::Valid(piece)
 					} else {
-						Rgba([0, 0, 0, 255])
-					};
-
-					if x < 256 && y < 256 {
-						img.put_pixel(x, y, color);
+						CachedTexture::Pending
 					}
 				}
-
-				let color_image = ColorImage::from_rgba_unmultiplied(
-					[256usize, 256usize],
-					img.as_raw(),
-				);
-				let handle = self.egui_ctx.load_texture(
-					format!("{}:{}:{}", tile_id.x, tile_id.y, tile_id.zoom),
-					color_image,
-					TextureOptions::default(),
-				);
-
-				CachedTexture::Valid(Tile::Raster(handle))
+			}
+		} else {
+			self.tiles.get_or_insert(tile_id, || {
+				let _ = self.parent_thread_sender.send(ThreadMessage::CreateWork(tile_id, self.mandelbrot_set_properties.iterations));
+				CachedTexture::Pending
 			}).clone()
+		}
+	}
+
+	fn poll_tile(&mut self, tile_id: TileId) -> Option<Tile> {
+		let _ = self.parent_thread_sender.send(ThreadMessage::Poll(tile_id));
+		loop {
+			match self.parent_thread_receiver.try_recv() {
+				Ok(Some(msg)) => match msg {
+					ThreadMessage::Completed(tid, color_image) => {
+						if tid == tile_id {
+							debug!("match..");
+							let handle = self.egui_ctx.load_texture(
+								format!("{}:{}:{}", tile_id.x, tile_id.y, tile_id.zoom),
+								color_image,
+								TextureOptions::default(),
+							);
+							return Some(Tile::Raster(handle));
+						} else {
+							debug!("mismatch..");
+							self.tiles.put(tid, CachedTexture::Valid(Tile::Raster(
+								self.egui_ctx.load_texture(
+									format!("{}:{}:{}", tid.x, tid.y, tid.zoom),
+									color_image,
+									TextureOptions::default(),
+								)
+							)));
+						}
+					}
+					ThreadMessage::NotReady(tid) => {
+						if tid == tile_id {
+							return None;
+						} else {
+							continue;
+						}
+					}
+					_ => {}
+				},
+				Ok(None) => return None,
+				Err(_) => return None,
+			}
+		}
 	}
 }
 
@@ -97,9 +114,7 @@ impl Tiles for FractalTiles {
 			let (donor_tile_id, uv) = interpolate_from_lower_zoom(tile_id, zoom_candidate);
 			match self.load(donor_tile_id) {
 				CachedTexture::Valid(texture) => Some(TilePiece::new(texture.clone(), uv)),
-				CachedTexture::Invalid | CachedTexture::Pending => {
-					None
-				},
+				CachedTexture::Invalid | CachedTexture::Pending => None,
 			}
 		})
 	}
@@ -107,9 +122,9 @@ impl Tiles for FractalTiles {
 	fn attribution(&self) -> Attribution {
 		Attribution {
 			text: "Mandelbrot Set",
-			url: "",
+			url: "".into(),
 			logo_dark: None,
-			logo_light: None
+			logo_light: None,
 		}
 	}
 

@@ -1,13 +1,10 @@
-use kanal::Sender;
 use walkers::{Map, MapMemory};
 use crate::threads;
-use crate::threads::ThreadMessage;
 use crate::tiles::FractalTiles;
 
 pub struct App {
 	tiles: FractalTiles,
 	map_memory: MapMemory,
-	parent_thread_sender: Sender<ThreadMessage>
 }
 
 impl App {
@@ -16,9 +13,8 @@ impl App {
 		let (parent_thread_sender, parent_thread_receiver) = threads::create_parent_thread();
 		map_memory.set_zoom(1.).unwrap();
 		Self {
-			tiles: FractalTiles::new(cc.egui_ctx.clone(), parent_thread_sender.clone()),
+			tiles: FractalTiles::new(cc.egui_ctx.clone(), parent_thread_sender, parent_thread_receiver),
 			map_memory,
-			parent_thread_sender
 		}
 	}
 }
