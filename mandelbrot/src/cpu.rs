@@ -55,31 +55,67 @@ pub fn mandelbrot_set(
 	max_iter: usize,
 	exp: f64,
 ) -> Vec<(f64, f64, usize)> {
-	let step = (
-		(real.end - real.start) / samples.0 as f64,
-		(complex.end - complex.start) / samples.1 as f64,
-	);
+	let (nx, ny) = samples;
+	let dx = (real.end - real.start) / nx as f64;
+	let dy = (complex.end - complex.start) / ny as f64;
+	let mut out = Vec::with_capacity(nx * ny);
 
-	(0..(samples.0 * samples.1))
-		.into_iter()
-		.map(|k| {
-			let c = (
-				real.start + step.0 * (k % samples.0) as f64,
-				complex.start + step.1 * (k / samples.0) as f64,
-			);
-			let mut z = (0.0f64, 0.0f64);
-			let mut cnt = 0usize;
-			while cnt < max_iter && z.0 * z.0 + z.1 * z.1 <= 1e10 {
-				let r = (z.0 * z.0 + z.1 * z.1).sqrt();
-				let theta = z.1.atan2(z.0);
+	let bailout_sq = 1e10f64;
+
+	if (exp - 2.0).abs() < f64::EPSILON {
+		for j in 0..ny {
+			let cy = complex.start + j as f64 * dy;
+			for i in 0..nx {
+				let cx = real.start + i as f64 * dx;
+				let mut zx = 0.0f64;
+				let mut zy = 0.0f64;
+				let mut iter = 0usize;
+				while iter < max_iter {
+					let zx2 = zx * zx;
+					let zy2 = zy * zy;
+					if zx2 + zy2 > bailout_sq {
+						break;
+					}
+					let new_zx = zx2 - zy2 + cx;
+					let new_zy = 2.0 * zx * zy + cy;
+					zx = new_zx;
+					zy = new_zy;
+					iter += 1;
+				}
+				out.push((cx, cy, iter));
+			}
+		}
+		return out;
+	}
+
+	for j in 0..ny {
+		let cy = complex.start + j as f64 * dy;
+		for i in 0..nx {
+			let cx = real.start + i as f64 * dx;
+			let mut zx = 0.0f64;
+			let mut zy = 0.0f64;
+			let mut iter = 0usize;
+			while iter < max_iter {
+				let zx2 = zx * zx;
+				let zy2 = zy * zy;
+				let r2 = zx2 + zy2;
+				if r2 > bailout_sq {
+					break;
+				}
+				let r = r2.sqrt();
+				let theta = zy.atan2(zx);
 				let r_pow = r.powf(exp);
 				let new_theta = theta * exp;
-				let zr = r_pow * new_theta.cos();
-				let zi = r_pow * new_theta.sin();
-				z = (zr + c.0, zi + c.1);
-				cnt += 1;
+				let new_zx = r_pow * new_theta.cos() + cx;
+				let new_zy = r_pow * new_theta.sin() + cy;
+				zx = new_zx;
+				zy = new_zy;
+				iter += 1;
 			}
-			(c.0, c.1, cnt)
-		})
-		.collect()
+			out.push((cx, cy, iter));
+		}
+	}
+
+	out
 }
+

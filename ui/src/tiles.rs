@@ -11,7 +11,7 @@ use crate::threads::ThreadMessage;
 pub type Set = Vec<(f64, f64, usize)>;
 
 #[derive(Clone)]
-enum CachedTexture {
+pub enum CachedTexture {
 	Valid(Tile),
 	#[allow(unused)]
 	Invalid,
@@ -19,9 +19,10 @@ enum CachedTexture {
 }
 
 pub struct FractalTiles {
-	tiles: LruCache<TileId, CachedTexture>,
+	pub(crate) tiles: LruCache<TileId, CachedTexture>, // public for the crate so we can clear the cache if parameters like iterations have been changed
 	egui_ctx: Context,
 	pub(crate) mandelbrot_set_properties: MandelbrotSetProperties,
+	pub(crate) old_mandelbrot_set_properties: MandelbrotSetProperties,
 	parent_thread_sender: KSender<ThreadMessage>,
 	parent_thread_receiver: KReceiver<ThreadMessage>,
 }
@@ -29,7 +30,8 @@ pub struct FractalTiles {
 #[derive(Default, Clone, Copy, Debug, PartialEq)]
 pub struct MandelbrotSetProperties {
 	pub iterations: usize,
-	pub exponent: usize
+	pub exponent: usize,
+	pub samples: (usize, usize)
 }
 
 impl FractalTiles {
@@ -38,10 +40,16 @@ impl FractalTiles {
 		parent_thread_sender: KSender<ThreadMessage>,
 		parent_thread_receiver: KReceiver<ThreadMessage>,
 	) -> Self {
+		let tile_size_points: u32 = 256;
+		let dpr = egui_ctx.pixels_per_point();
+		let samples = ((tile_size_points as f32 * dpr).round() as usize, (tile_size_points as f32 * dpr).round() as usize);
+		debug!("samples={samples:?}");
+		let props = MandelbrotSetProperties { iterations: 255, exponent: 2, samples };
 		Self {
 			tiles: LruCache::unbounded(),
 			egui_ctx,
-			mandelbrot_set_properties: MandelbrotSetProperties { iterations: 255, exponent: 2 },
+			mandelbrot_set_properties: props,
+			old_mandelbrot_set_properties: props,
 			parent_thread_sender,
 			parent_thread_receiver,
 		}
@@ -53,6 +61,7 @@ impl FractalTiles {
 				CachedTexture::Valid(tile) => CachedTexture::Valid(tile.clone()),
 				CachedTexture::Invalid => CachedTexture::Invalid,
 				CachedTexture::Pending => {
+					debug!("polling for {tile_id:?}");
 					if let Some(piece) = self.poll_tile(tile_id) {
 						self.tiles.put(tile_id, CachedTexture::Valid(piece.clone()));
 						CachedTexture::Valid(piece)

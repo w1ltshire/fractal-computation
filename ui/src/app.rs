@@ -22,6 +22,10 @@ impl App {
 
 impl eframe::App for App {
 	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+		if self.tiles.mandelbrot_set_properties != self.tiles.old_mandelbrot_set_properties {
+
+		}
+
 		egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
 			egui::MenuBar::new().ui(ui, |ui| {
 				let is_web = cfg!(target_arch = "wasm32");
@@ -31,24 +35,29 @@ impl eframe::App for App {
 							ctx.send_viewport_cmd(egui::ViewportCommand::Close);
 						}
 					});
-					ui.add_space(16.0);
+					ui.add_space(32.0);
 				}
 
 				egui::widgets::global_theme_preference_buttons(ui);
 			});
 		});
 
-		egui::SidePanel::right("side_panel").exact_width(160.0).show(ctx, |ui| {
+		egui::SidePanel::right("side_panel").exact_width(180.0).show(ctx, |ui| {
 			ui.label(RichText::new("Parameters").size(18.0));
 			ui.separator();
 			ui.label(RichText::new("Render settings").size(14.0));
 			ui.horizontal(|ui| {
-				ui.label("Iterations");
+				ui.label("Iterations: ");
 				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.iterations)) ;
 			});
 			ui.horizontal(|ui| {
-				ui.label("Exponent");
+				ui.label("Exponent: ");
 				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.exponent));
+			});
+			ui.horizontal(|ui| {
+				ui.label("Samples: ");
+				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.samples.0));
+				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.samples.1));
 			});
 		});
 
