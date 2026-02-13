@@ -1,4 +1,3 @@
-use std::ops::Range;
 use itertools::Itertools;
 use std::sync::{Arc, Mutex};
 use rayon::prelude::*;
@@ -50,10 +49,11 @@ pub fn mandelbrot_simd(data: &mut [[u8; 4]], from: (f64, f64), to: (f64, f64), w
 }
 
 pub fn mandelbrot_set(
-	real: Range<f64>,
-	complex: Range<f64>,
+	real: std::ops::Range<f64>,
+	complex: std::ops::Range<f64>,
 	samples: (usize, usize),
-	max_iter: usize
+	max_iter: usize,
+	exp: f64,
 ) -> Vec<(f64, f64, usize)> {
 	let step = (
 		(real.end - real.start) / samples.0 as f64,
@@ -67,10 +67,16 @@ pub fn mandelbrot_set(
 				real.start + step.0 * (k % samples.0) as f64,
 				complex.start + step.1 * (k / samples.0) as f64,
 			);
-			let mut z = (0.0, 0.0);
-			let mut cnt = 0;
+			let mut z = (0.0f64, 0.0f64);
+			let mut cnt = 0usize;
 			while cnt < max_iter && z.0 * z.0 + z.1 * z.1 <= 1e10 {
-				z = (z.0 * z.0 - z.1 * z.1 + c.0, 2.0 * z.0 * z.1 + c.1);
+				let r = (z.0 * z.0 + z.1 * z.1).sqrt();
+				let theta = z.1.atan2(z.0);
+				let r_pow = r.powf(exp);
+				let new_theta = theta * exp;
+				let zr = r_pow * new_theta.cos();
+				let zi = r_pow * new_theta.sin();
+				z = (zr + c.0, zi + c.1);
 				cnt += 1;
 			}
 			(c.0, c.1, cnt)

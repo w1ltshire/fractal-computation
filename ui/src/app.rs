@@ -44,7 +44,11 @@ impl eframe::App for App {
 			ui.label(RichText::new("Render settings").size(14.0));
 			ui.horizontal(|ui| {
 				ui.label("Iterations");
-				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.iterations))
+				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.iterations)) ;
+			});
+			ui.horizontal(|ui| {
+				ui.label("Exponent");
+				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.exponent));
 			});
 		});
 

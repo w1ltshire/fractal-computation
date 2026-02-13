@@ -13,6 +13,7 @@ pub type Set = Vec<(f64, f64, usize)>;
 #[derive(Clone)]
 enum CachedTexture {
 	Valid(Tile),
+	#[allow(unused)]
 	Invalid,
 	Pending,
 }
@@ -25,9 +26,10 @@ pub struct FractalTiles {
 	parent_thread_receiver: KReceiver<ThreadMessage>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy, Debug, PartialEq)]
 pub struct MandelbrotSetProperties {
 	pub iterations: usize,
+	pub exponent: usize
 }
 
 impl FractalTiles {
@@ -39,7 +41,7 @@ impl FractalTiles {
 		Self {
 			tiles: LruCache::unbounded(),
 			egui_ctx,
-			mandelbrot_set_properties: MandelbrotSetProperties { iterations: 255 },
+			mandelbrot_set_properties: MandelbrotSetProperties { iterations: 255, exponent: 2 },
 			parent_thread_sender,
 			parent_thread_receiver,
 		}
@@ -61,7 +63,7 @@ impl FractalTiles {
 			}
 		} else {
 			self.tiles.get_or_insert(tile_id, || {
-				let _ = self.parent_thread_sender.send(ThreadMessage::CreateWork(tile_id, self.mandelbrot_set_properties.iterations));
+				let _ = self.parent_thread_sender.send(ThreadMessage::CreateWork(tile_id, self.mandelbrot_set_properties));
 				CachedTexture::Pending
 			}).clone()
 		}

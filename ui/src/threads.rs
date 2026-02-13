@@ -11,12 +11,13 @@ use eframe::epaint::ColorImage;
 use image::{ImageBuffer, Rgba};
 use kanal::{Receiver, Sender};
 use log::debug;
+use crate::tiles::MandelbrotSetProperties;
 
 /// Possible messages to be passed/received to/from threads (parent and workers)
 #[derive(Debug, PartialEq, Clone)]
 pub enum ThreadMessage {
 	/// Make the parent thread spawn a worker computing the fractal set
-	CreateWork(TileId, usize),
+	CreateWork(TileId, MandelbrotSetProperties),
 	/// Poll the worker thread assigned to this tile id
 	Poll(TileId),
 	/// The ready, calculated fractal set image
@@ -37,8 +38,8 @@ pub fn create_parent_thread() -> (Sender<ThreadMessage>, Receiver<ThreadMessage>
 			match receiver_from_main.try_recv() {
 				Ok(Some(msg)) => {
 					match msg {
-						ThreadMessage::CreateWork(tile_id, iters) => {
-							receivers.insert(tile_id, worker_thread(tile_id, iters));
+						ThreadMessage::CreateWork(tile_id, props) => {
+							receivers.insert(tile_id, worker_thread(tile_id, props));
 						}
 						ThreadMessage::Poll(tile_id) => {
 							if let Some((sender_to_worker, receiver_from_worker)) = receivers.get_mut(&tile_id) {
@@ -91,7 +92,7 @@ pub fn create_parent_thread() -> (Sender<ThreadMessage>, Receiver<ThreadMessage>
 	(sender_to_parent, receiver_from_parent)
 }
 
-pub fn worker_thread(tile_id: TileId, iterations: usize) -> (Sender<ThreadMessage>, Receiver<ThreadMessage>) {
+pub fn worker_thread(tile_id: TileId, props: MandelbrotSetProperties) -> (Sender<ThreadMessage>, Receiver<ThreadMessage>) {
 	let (sender_to_worker, receiver_from_parent) = kanal::unbounded::<ThreadMessage>();
 	let (sender_to_parent, receiver_from_worker) = kanal::unbounded::<ThreadMessage>();
 
@@ -106,15 +107,20 @@ pub fn worker_thread(tile_id: TileId, iterations: usize) -> (Sender<ThreadMessag
 		let to = (x_center + scale, y_center + scale);
 
 		let samples = (512, 512);
-		let max_iter = iterations;
 
 		let mut img = ImageBuffer::<Rgba<u8>, _>::new(256, 256);
 
-		for (c_re, c_im, count) in mandelbrot::cpu::mandelbrot_set(from.0..to.0, from.1..to.1, samples, max_iter) {
+		for (c_re, c_im, count) in mandelbrot::cpu::mandelbrot_set(
+			from.0..to.0, 
+			from.1..to.1,
+			samples,
+			props.iterations,
+			props.exponent as f64
+		) {
 			let x = ((c_re - from.0) / scale * 256.0) as u32;
 			let y = ((c_im - from.1) / scale * 256.0) as u32;
 
-			let color = if count < max_iter {
+			let color = if count < props.iterations {
 				let intensity = (count as u8) % 255;
 				Rgba([intensity, intensity, intensity, 255])
 			} else {
