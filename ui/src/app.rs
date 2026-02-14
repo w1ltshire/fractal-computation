@@ -12,7 +12,7 @@ impl App {
 	pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
 		let mut map_memory = MapMemory::default();
 		let (parent_thread_sender, parent_thread_receiver) = threads::create_parent_thread();
-		map_memory.set_zoom(1.).unwrap();
+		map_memory.set_zoom(1.5);
 		Self {
 			tiles: FractalTiles::new(cc.egui_ctx.clone(), parent_thread_sender, parent_thread_receiver),
 			map_memory,
@@ -45,20 +45,9 @@ impl eframe::App for App {
 		egui::SidePanel::right("side_panel").exact_width(180.0).show(ctx, |ui| {
 			ui.label(RichText::new("Parameters").size(18.0));
 			ui.separator();
-			ui.label(RichText::new("Render settings").size(14.0));
-			ui.horizontal(|ui| {
-				ui.label("Iterations: ");
-				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.iterations)) ;
-			});
-			ui.horizontal(|ui| {
-				ui.label("Exponent: ");
-				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.exponent));
-			});
-			ui.horizontal(|ui| {
-				ui.label("Samples: ");
-				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.samples.0));
-				ui.add(DragValue::new(&mut self.tiles.mandelbrot_set_properties.samples.1));
-			});
+			render_settings(ui, self);
+			ui.separator();
+			position_settings(ui, self);
 		});
 
 		egui::CentralPanel::default().show(ctx, |ui| {
@@ -71,4 +60,31 @@ impl eframe::App for App {
 			);
 		});
 	}
+}
+
+fn render_settings(ui: &mut egui::Ui, app: &mut App) {
+	ui.label(RichText::new("Render settings").size(14.0));
+	ui.horizontal(|ui| {
+		ui.label("Iterations: ")
+			.on_hover_text(RichText::new("Level of detail"));
+		ui.add(DragValue::new(&mut app.tiles.mandelbrot_set_properties.iterations));
+	});
+	ui.horizontal(|ui| {
+		ui.label("Exponent: ")
+			.on_hover_text(RichText::new("Level of symmetry"));
+		ui.add(DragValue::new(&mut app.tiles.mandelbrot_set_properties.exponent));
+	});
+	ui.horizontal(|ui| {
+		ui.label("Samples: ");
+		ui.add(DragValue::new(&mut app.tiles.mandelbrot_set_properties.samples.0));
+		ui.add(DragValue::new(&mut app.tiles.mandelbrot_set_properties.samples.1));
+	});
+}
+
+fn position_settings(ui: &mut egui::Ui, app: &mut App) {
+	ui.label(RichText::new("Position").size(14.0));
+	ui.horizontal(|ui| {
+		ui.label("Zoom: ");
+		ui.add(DragValue::new(&mut app.map_memory.zoom.0));
+	});
 }

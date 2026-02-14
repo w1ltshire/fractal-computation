@@ -1,3 +1,4 @@
+#[cfg(target_arch = "wasm32")]
 use wasm_thread as thread;
 
 /// The [`egui`] app implementation.
@@ -10,6 +11,8 @@ pub mod threads;
 // if targeting desktop or smth
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
+    use std::default::Default;
+
     env_logger::init_from_env(env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"));
 
     let native_options = eframe::NativeOptions {
@@ -29,7 +32,7 @@ fn main() -> eframe::Result {
 fn main() {
     use eframe::wasm_bindgen::JsCast as _;
 
-    console_log::init_with_level(log::Level::Debug).unwrap();
+    console_log::init_with_level(log::Level::Info).unwrap();
     console_error_panic_hook::set_once();
 
     log::info!("trans rights are human rights 🏳️‍⚧️");

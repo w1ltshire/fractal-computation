@@ -106,14 +106,13 @@ pub fn worker_thread(tile_id: TileId, props: MandelbrotSetProperties) -> (Sender
 		let from = (x_center, y_center);
 		let to = (x_center + scale, y_center + scale);
 
-		let samples = (512, 512);
 
 		let mut img = ImageBuffer::<Rgba<u8>, _>::new(256, 256);
 
 		for (c_re, c_im, count) in mandelbrot::cpu::mandelbrot_set(
-			from.0..to.0, 
+			from.0..to.0,
 			from.1..to.1,
-			samples,
+			props.samples,
 			props.iterations,
 			props.exponent as f64
 		) {
