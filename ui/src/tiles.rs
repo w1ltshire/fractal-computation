@@ -1,12 +1,14 @@
+use std::collections::HashMap;
+use std::sync::Arc;
 use eframe::emath::{pos2, Rect};
 use eframe::epaint::textures::TextureOptions;
-use egui::Context;
-use kanal::{Receiver as KReceiver, Sender as KSender};
+use egui::{ColorImage, Context};
+use egui_async::Bind;
 use log::debug;
 use lru::LruCache;
 use walkers::{Tile, TileId, TilePiece, Tiles};
 use walkers::sources::Attribution;
-use crate::threads::ThreadMessage;
+use crate::fractal_set;
 
 pub type Set = Vec<(f64, f64, usize)>;
 
@@ -21,10 +23,9 @@ pub enum CachedTexture {
 pub struct FractalTiles {
 	pub(crate) tiles: LruCache<TileId, CachedTexture>, // public for the crate so we can clear the cache if parameters like iterations have been changed
 	egui_ctx: Context,
+	binds: HashMap<TileId, Bind<ColorImage, String>>,
 	pub(crate) mandelbrot_set_properties: MandelbrotSetProperties,
 	pub(crate) old_mandelbrot_set_properties: MandelbrotSetProperties,
-	parent_thread_sender: KSender<ThreadMessage>,
-	parent_thread_receiver: KReceiver<ThreadMessage>,
 }
 
 #[derive(Default, Clone, Copy, Debug, PartialEq)]
@@ -37,8 +38,6 @@ pub struct MandelbrotSetProperties {
 impl FractalTiles {
 	pub fn new(
 		egui_ctx: Context,
-		parent_thread_sender: KSender<ThreadMessage>,
-		parent_thread_receiver: KReceiver<ThreadMessage>,
 	) -> Self {
 		let tile_size_points: u32 = 256;
 		let dpr = egui_ctx.pixels_per_point();
@@ -48,73 +47,46 @@ impl FractalTiles {
 		Self {
 			tiles: LruCache::unbounded(),
 			egui_ctx,
+			binds: HashMap::new(),
 			mandelbrot_set_properties: props,
 			old_mandelbrot_set_properties: props,
-			parent_thread_sender,
-			parent_thread_receiver,
 		}
 	}
 
 	fn load(&mut self, tile_id: TileId) -> CachedTexture {
-		if let Some(tex) = self.tiles.get(&tile_id) {
-			match tex {
-				CachedTexture::Valid(tile) => CachedTexture::Valid(tile.clone()),
-				CachedTexture::Invalid => CachedTexture::Invalid,
+		let load_texture = |ctx: &Context, id: TileId, set: Arc<ColorImage>| {
+			let handle = ctx.load_texture(format!("{id:?}"), set, TextureOptions::default());
+			CachedTexture::Valid(Tile::Raster(handle))
+		};
+
+		if let Some(tile) = self.tiles.get(&tile_id) {
+			return match tile {
+				CachedTexture::Valid(t) => CachedTexture::Valid(t.clone()),
 				CachedTexture::Pending => {
-					debug!("polling for {tile_id:?}");
-					if let Some(piece) = self.poll_tile(tile_id) {
-						self.tiles.put(tile_id, CachedTexture::Valid(piece.clone()));
-						CachedTexture::Valid(piece)
+					let bind = self.binds.get_mut(&tile_id).unwrap();
+					if let Some(set) = bind.read() {
+						// no visible reason why result would be `Err`? i hope
+						load_texture(&self.egui_ctx, tile_id, Arc::from(set.clone().unwrap()))
 					} else {
 						CachedTexture::Pending
 					}
 				}
-			}
-		} else {
-			self.tiles.get_or_insert(tile_id, || {
-				let _ = self.parent_thread_sender.send(ThreadMessage::CreateWork(tile_id, self.mandelbrot_set_properties));
-				CachedTexture::Pending
-			}).clone()
+				CachedTexture::Invalid => CachedTexture::Invalid,
+			};
 		}
-	}
 
-	fn poll_tile(&mut self, tile_id: TileId) -> Option<Tile> {
-		let _ = self.parent_thread_sender.send(ThreadMessage::Poll(tile_id));
-		loop {
-			match self.parent_thread_receiver.try_recv() {
-				Ok(Some(msg)) => match msg {
-					ThreadMessage::Completed(tid, color_image) => {
-						if tid == tile_id {
-							debug!("match..");
-							let handle = self.egui_ctx.load_texture(
-								format!("{}:{}:{}", tile_id.x, tile_id.y, tile_id.zoom),
-								color_image,
-								TextureOptions::default(),
-							);
-							return Some(Tile::Raster(handle));
-						} else {
-							debug!("mismatch..");
-							self.tiles.put(tid, CachedTexture::Valid(Tile::Raster(
-								self.egui_ctx.load_texture(
-									format!("{}:{}:{}", tid.x, tid.y, tid.zoom),
-									color_image,
-									TextureOptions::default(),
-								)
-							)));
-						}
-					}
-					ThreadMessage::NotReady(tid) => {
-						if tid == tile_id {
-							return None;
-						} else {
-							continue;
-						}
-					}
-					_ => {}
-				},
-				Ok(None) => return None,
-				Err(_) => return None,
-			}
+		// ensure a bind exists
+		self.binds.entry(tile_id).or_insert_with(Bind::default);
+
+		let bind = self.binds.get_mut(&tile_id).unwrap();
+		let props = self.mandelbrot_set_properties.clone();
+
+		if let Some(set) = bind.read_or_request(|| async move {
+			Ok(fractal_set::generate_color_image(tile_id, props))
+		}) {
+			load_texture(&self.egui_ctx, tile_id, Arc::from(set.clone().unwrap()))
+		} else {
+			CachedTexture::Pending
 		}
 	}
 }

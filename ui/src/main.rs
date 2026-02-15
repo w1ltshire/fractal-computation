@@ -5,8 +5,7 @@ use wasm_thread as thread;
 pub mod app;
 /// Implementation of [`tiles::Tiles`]
 pub mod tiles;
-/// Threaded computation
-pub mod threads;
+pub mod fractal_set;
 
 // if targeting desktop or smth
 #[cfg(not(target_arch = "wasm32"))]

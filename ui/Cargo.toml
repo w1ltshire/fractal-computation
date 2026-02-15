@@ -25,4 +25,4 @@ mandelbrot = { path = "../mandelbrot" }
 image = "0.25.9"
 lru = "0.16.3"
 kanal = "0.1.1"
-chrono = "0.4.43"
+egui-async = "0.3.4"

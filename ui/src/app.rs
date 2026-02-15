@@ -1,6 +1,5 @@
 use egui::{DragValue, RichText};
 use walkers::{Map, MapMemory};
-use crate::threads;
 use crate::tiles::FractalTiles;
 
 pub struct App {
@@ -11,10 +10,9 @@ pub struct App {
 impl App {
 	pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
 		let mut map_memory = MapMemory::default();
-		let (parent_thread_sender, parent_thread_receiver) = threads::create_parent_thread();
-		map_memory.set_zoom(1.5);
+		map_memory.set_zoom(1.5).unwrap();
 		Self {
-			tiles: FractalTiles::new(cc.egui_ctx.clone(), parent_thread_sender, parent_thread_receiver),
+			tiles: FractalTiles::new(cc.egui_ctx.clone()),
 			map_memory,
 		}
 	}
@@ -22,6 +20,7 @@ impl App {
 
 impl eframe::App for App {
 	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+		ctx.plugin_or_default::<egui_async::EguiAsyncPlugin>();
 		if self.tiles.mandelbrot_set_properties != self.tiles.old_mandelbrot_set_properties {
 
 		}
